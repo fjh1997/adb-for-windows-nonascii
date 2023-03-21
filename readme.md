@@ -1,4 +1,5 @@
 # gdb-for-windows-nonascii
+[release](https://github.com/fjh1997/gdb-for-windows-nonascii/releases/download/1.0.0/release.zip)
 
 tmp solution of adb.exe truncating non-ascii name in windows when pull and push.
 
