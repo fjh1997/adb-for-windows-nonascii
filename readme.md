@@ -9,8 +9,7 @@ run build-mingw64-toolchain.sh to make toolchain.clean and build adb.exe as usua
 or much easier.In msys2
 ```
 cd mingw-w64-master
-git apply basename.patch
-git apply dirname.patch
+git apply rewrite.patch
 cd mingw-w64-crt
 ./configure
 make lib32/libmingwex.a
