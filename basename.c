@@ -39,19 +39,18 @@ char *__cdecl basename(char *path)
 		/* allocate sufficient local storage space,
 		 * in which to create a  character reference copy of path
 		 */
-		char refcopy[1 + strlen(path)];
+		char refcopy[1 + (len = strlen(path))];
 		/* create the character reference copy of path,
 		 * and step over the drive designator, if present ...
 		 */
-		char *refpath = strcpy(refcopy, path);
-
-		if ((len = strlen(refpath)) > 1 && refpath[1] == ':')
+		char *refpath = refcopy;
+		strcpy_s(refcopy, sizeof(refcopy), path);
+		if ( strlen(refcopy) > 1 && refpath[1] == ':')
 		{
 			/* FIXME: maybe should confirm *refpath is a valid drive designator */
 			refpath += 2;
 		}
-		/* ensure that our character reference path is NUL terminated */
-		refcopy[len] = '\0';
+
 		/* check again, just to ensure we still have a non-empty path name ... */
 		if (*refpath)
 		{
@@ -85,8 +84,7 @@ char *__cdecl basename(char *path)
 				/* if it's not empty,
 				 * then we skip over the dirname,
 				 * to return the resolved basename.  */
-				if ((len = strlen(strcpy(path, refcopy))) != 0)
-					path[len] = '\0';
+				strcpy_s(path, sizeof(refcopy), refcopy);
 				*refname = '\0';
 				if ((len = strlen(refcopy)) != 0)
 					path += len;
