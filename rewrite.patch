@@ -1,0 +1,492 @@
+From 1a3850357575cbc4e1cbc444c644274272050439 Mon Sep 17 00:00:00 2001
+From: FunnyBiu <549308442@qq.com>
+Date: Wed, 22 Mar 2023 12:49:31 +0800
+Subject: [PATCH] Add files via upload
+
+---
+ mingw-w64-crt/misc/basename.c | 173 +++++++++------------
+ mingw-w64-crt/misc/dirname.c  | 279 ++++++++++++++++------------------
+ 2 files changed, 206 insertions(+), 246 deletions(-)
+
+diff --git a/mingw-w64-crt/misc/basename.c b/mingw-w64-crt/misc/basename.c
+index c45dbbb36..bf7162258 100644
+--- a/mingw-w64-crt/misc/basename.c
++++ b/mingw-w64-crt/misc/basename.c
+@@ -29,107 +29,86 @@
+ #define __cdecl
+ #endif
+ 
+-char * __cdecl
+-basename (char *path)
++char *__cdecl basename(char *path)
+ {
+-  static char *retfail = NULL;
+-  size_t len;
+-  /* to handle path names for files in multibyte character locales,
+-   * we need to set up LC_CTYPE to match the host file system locale
+-   */
+-  char *locale = setlocale (LC_CTYPE, NULL);
++	static char *retfail = NULL;
++	size_t len;
+ 
+-  if (locale != NULL)
+-    locale = strdup (locale);
+-  setlocale (LC_CTYPE, "");
++	if (path && *path)
++	{
++		/* allocate sufficient local storage space,
++		 * in which to create a  character reference copy of path
++		 */
++		char refcopy[1 + (len = strlen(path))];
++		/* create the character reference copy of path,
++		 * and step over the drive designator, if present ...
++		 */
++		char *refpath = refcopy;
++		strcpy_s(refcopy, sizeof(refcopy), path);
++		if ( strlen(refcopy) > 1 && refpath[1] == ':')
++		{
++			/* FIXME: maybe should confirm *refpath is a valid drive designator */
++			refpath += 2;
++		}
+ 
+-  if (path && *path)
+-    {
+-      /* allocate sufficient local storage space,
+-       * in which to create a wide character reference copy of path
+-       */
+-      wchar_t refcopy[1 + (len = mbstowcs (NULL, path, 0))];
+-      /* create the wide character reference copy of path,
+-       * and step over the drive designator, if present ...
+-       */
+-      wchar_t *refpath = refcopy;
++		/* check again, just to ensure we still have a non-empty path name ... */
++		if (*refpath)
++		{
++			/* and, when we do, process it  ...
++			 * scanning from left to right, to the char after the final dir separator.  */
++			char *refname;
+ 
+-      if ((len = mbstowcs( refpath, path, len)) > 1 && refpath[1] == L':')
+-        {
+-	  /* FIXME: maybe should confirm *refpath is a valid drive designator */
+-	  refpath += 2;
+-        }
+-      /* ensure that our wide character reference path is NUL terminated */
+-      refcopy[len] = L'\0';
+-      /* check again, just to ensure we still have a non-empty path name ... */
+-      if (*refpath)
+-        {
+-	  /* and, when we do, process it in the wide character domain ...
+-	   * scanning from left to right, to the char after the final dir separator.  */
+-	  wchar_t *refname;
++			for (refname = refpath; *refpath; ++refpath)
++			{
++				if (*refpath == '/' || *refpath == '\\')
++				{
++					/* we found a dir separator ...
++					 * step over it, and any others which immediately follow it.  */
++					while (*refpath == '/' || *refpath == '\\')
++						++refpath;
++					/* if we didn't reach the end of the path string ... */
++					if (*refpath)
++						/* then we have a new candidate for the base name.  */
++						refname = refpath;
++					/* otherwise ...
++					 * strip off any trailing dir separators which we found.  */
++					else
++						while (refpath > refname && (*--refpath == '/' || *refpath == '\\'))
++							*refpath = '\0';
++				}
++			}
+ 
+-	  for (refname = refpath; *refpath; ++refpath)
+-	    {
+-	      if (*refpath == L'/' || *refpath == L'\\')
+-	        {
+-		  /* we found a dir separator ...
+-		   * step over it, and any others which immediately follow it.  */
+-		  while (*refpath == L'/' || *refpath == L'\\')
+-		    ++refpath;
+-		  /* if we didn't reach the end of the path string ... */
+-		  if (*refpath)
+-		    /* then we have a new candidate for the base name.  */
+-		    refname = refpath;
+-		  /* otherwise ...
+-		   * strip off any trailing dir separators which we found.  */
+-		  else
+-		    while (refpath > refname
+-		      && (*--refpath == L'/' || *refpath == L'\\')   )
+-		      *refpath = L'\0';
+-	        }
+-	    }
+-	  /* in the wide character domain ...
+-	   * refname now points at the resolved base name ...  */
+-	  if (*refname)
+-	    {
+-	      /* if it's not empty,
+-	       * then we transform the full normalised path back into 
+-	       * the multibyte character domain, and skip over the dirname,
+-	       * to return the resolved basename.  */
+-	      if ((len = wcstombs( path, refcopy, len)) != (size_t)(-1))
+-		path[len] = '\0';
+-	      *refname = L'\0';
+-	      if ((len = wcstombs( NULL, refcopy, 0 )) != (size_t)(-1))
+-		path += len;
+-	    }
+-	  else
+-	    {
+-	      /* the basename is empty, so return the default value of "/",
+-	       * transforming from wide char to multibyte char domain, and
+-	       * returning it in our own buffer.  */
+-	      retfail = realloc (retfail, len = 1 + wcstombs (NULL, L"/", 0));
+-	      wcstombs (path = retfail, L"/", len);
+-	    }
+-	  /* restore the caller's locale, clean up, and return the result */
+-	  setlocale (LC_CTYPE, locale);
+-	  free (locale);
+-	  return path;
+-        }
+-      /* or we had an empty residual path name, after the drive designator,
+-       * in which case we simply fall through ...  */
+-    }
+-  /* and, if we get to here ...
+-   * the path name is either NULL, or it decomposes to an empty string;
+-   * in either case, we return the default value of "." in our own buffer,
+-   * reloading it with the correct value, transformed from the wide char
+-   * to the multibyte char domain, just in case the caller trashed it
+-   * after a previous call.
+-   */
+-  retfail = realloc (retfail, len = 1 + wcstombs( NULL, L".", 0));
+-  wcstombs (retfail, L".", len);
++			/* refname now points at the resolved base name ...  */
++			if (*refname)
++			{
++				/* if it's not empty,
++				 * then we skip over the dirname,
++				 * to return the resolved basename.  */
++				strcpy_s(path, sizeof(refcopy), refcopy);
++				*refname = '\0';
++				if ((len = strlen(refcopy)) != 0)
++					path += len;
++			}
++			else
++			{
++				/* the basename is empty, so return the default value of "/", and
++				 * returning it in our own buffer.  */
++				retfail = "/";
++			}
++			/*  return the result */
++			return path;
++		}
++		/* or we had an empty residual path name, after the drive designator,
++		 * in which case we simply fall through ...  */
++	}
++	/* and, if we get to here ...
++	 * the path name is either NULL, or it decomposes to an empty string;
++	 * in either case, we return the default value of "." in our own buffer,
++	 * reloading it with the correct value, just in case the caller trashed it
++	 * after a previous call.
++	 */
++	retfail = ".";
+ 
+-  /* restore the caller's locale, clean up, and return the result.  */
+-  setlocale (LC_CTYPE, locale);
+-  free (locale);
+-  return retfail;
++	/* eturn the result.  */
++	return retfail;
+ }
+diff --git a/mingw-w64-crt/misc/dirname.c b/mingw-w64-crt/misc/dirname.c
+index 9c5cf87db..7f059a01f 100644
+--- a/mingw-w64-crt/misc/dirname.c
++++ b/mingw-w64-crt/misc/dirname.c
+@@ -25,159 +25,140 @@
+ #include <libgen.h>
+ #include <locale.h>
+ 
+-#ifndef __cdecl  /* If compiling on any non-Win32 platform ... */
+-#define __cdecl  /* this may not be defined.                   */
++#ifndef __cdecl /* If compiling on any non-Win32 platform ... */
++#define __cdecl /* this may not be defined.                   */
+ #endif
+ 
+-char * __cdecl
+-dirname(char *path)
++char *__cdecl dirname(char *path)
+ {
+-  static char *retfail = NULL;
+-  size_t len;
+-  /* to handle path names for files in multibyte character locales,
+-   * we need to set up LC_CTYPE to match the host file system locale.  */
+-  char *locale = setlocale (LC_CTYPE, NULL);
++	static char *retfail = NULL;
++	size_t len;
+ 
+-  if (locale != NULL)
+-    locale = strdup (locale);
+-  setlocale (LC_CTYPE, "");
++	if (path && *path)
++	{
++		/* allocate sufficient local storage space,
++		 * in which to create a reference copy of path.  */
++		char refcopy[1 + (len = strlen(path))];
+ 
+-  if (path && *path)
+-    {
+-      /* allocate sufficient local storage space,
+-       * in which to create a wide character reference copy of path.  */
+-      wchar_t refcopy[1 + (len = mbstowcs (NULL, path, 0))];
+-      /* create the wide character reference copy of path */
+-      wchar_t *refpath = refcopy;
++		/* create the  reference copy of path */
++		char *refpath = refcopy;
++		strcpy_s(refpath, sizeof(refcopy), path);
++		len = strlen(refpath);
++		/* SUSv3 identifies a special case, where path is exactly equal to "//";
++		 * (we will also accept "\\" in the Win32 context, but not "/\" or "\/",
++		 *  and neither will we consider paths with an initial drive designator).
++		 * For this special case, SUSv3 allows the implementation to choose to
++		 * return "/" or "//", (or "\" or "\\", since this is Win32); we will
++		 * simply return the path unchanged, (i.e. "//" or "\\").  */
++		if (len > 1 && (refpath[0] == '/' || refpath[0] == '\\'))
++		{
++			if (refpath[1] == refpath[0] && refpath[2] == '\0')
++			{
++				return path;
++			}
++		}
++		/* For all other cases ...
++		 * step over the drive designator, if present ...  */
++		else if (len > 1 && refpath[1] == ':')
++		{
++			/* FIXME: maybe should confirm *refpath is a valid drive designator.  */
++			refpath += 2;
++		}
++		/* check again, just to ensure we still have a non-empty path name ... */
++		if (*refpath)
++		{
++#undef basename
++#define basename __the_basename /* avoid shadowing. */
++			/* reproduce the scanning logic of the "basename" function
++			 * to locate the basename component of the current path string,
++			 * (but also remember where the dirname component starts).  */
++			char *refname, *basename;
++			for (refname = basename = refpath; *refpath; ++refpath)
++			{
++				if (*refpath == '/' || *refpath == '\\')
++				{
++					/* we found a dir separator ...
++					 * step over it, and any others which immediately follow it.  */
++					while (*refpath == '/' || *refpath == '\\')
++						++refpath;
++					/* if we didn't reach the end of the path string ... */
++					if (*refpath)
++						/* then we have a new candidate for the base name.  */
++						basename = refpath;
++					else
++						/* we struck an early termination of the path string,
++						 * with trailing dir separators following the base name,
++						 * so break out of the for loop, to avoid overrun.  */
++						break;
++				}
++			}
++			/* now check,
++			 * to confirm that we have distinct dirname and basename components.  */
++			if (basename > refname)
++			{
++				/* and, when we do ...
++				 * backtrack over all trailing separators on the dirname component,
++				 * (but preserve exactly two initial dirname separators, if identical),
++				 * and add a NUL terminator in their place.  */
++				do
++					--basename;
++				while (basename > refname && (*basename == '/' || *basename == '\\'));
++				if (basename == refname && (refname[0] == '/' || refname[0] == '\\') && refname[1] == refname[0] && refname[2] != '/' && refname[2] != '\\')
++					++basename;
++				*++basename = '\0';
++				/* if the resultant dirname begins with EXACTLY two dir separators,
++				 * AND both are identical, then we preserve them.  */
++				refpath = refcopy;
++				while ((*refpath == '/' || *refpath == '\\'))
++					++refpath;
++				if ((refpath - refcopy) > 2 || refcopy[1] != refcopy[0])
++					refpath = refcopy;
++				/* and finally ...
++				 * we remove any residual, redundantly duplicated separators from the dirname,
++				 * reterminate, and return it.  */
++				refname = refpath;
++				while (*refpath)
++				{
++					if ((*refname++ = *refpath) == '/' || *refpath++ == '\\')
++					{
++						while (*refpath == '/' || *refpath == '\\')
++							++refpath;
++					}
++				}
++				*refname = '\0';
++				/* finally ...return the resultant dirname.  */
++				strcpy_s(path, sizeof(refcopy), refcopy);
++			}
++			else
++			{
++				/* either there were no dirname separators in the path name,
++				 * or there was nothing else ...  */
++				if (*refname == '/' || *refname == '\\')
++				{
++					/* it was all separators, so return one.  */
++					++refname;
++				}
++				else
++				{
++					/* there were no separators, so return '.'.  */
++					*refname++ = '.';
++				}
++				/* add a NUL terminator, in either case*/
++				*refname = '\0';
++				retfail = realloc(retfail, len = 1 + strlen(refcopy));
++				strcpy_s(retfail, sizeof(refcopy), refcopy);
++				path = retfail;
++			}
++			/* return the resolved dirname.  */
+ 
+-      len = mbstowcs (refpath, path, len);
+-      refcopy[len] = L'\0';
+-      /* SUSv3 identifies a special case, where path is exactly equal to "//";
+-       * (we will also accept "\\" in the Win32 context, but not "/\" or "\/",
+-       *  and neither will we consider paths with an initial drive designator).
+-       * For this special case, SUSv3 allows the implementation to choose to
+-       * return "/" or "//", (or "\" or "\\", since this is Win32); we will
+-       * simply return the path unchanged, (i.e. "//" or "\\").  */
+-      if (len > 1 && (refpath[0] == L'/' || refpath[0] == L'\\'))
+-        {
+-	  if (refpath[1] == refpath[0] && refpath[2] == L'\0')
+-	    {
+-	      setlocale (LC_CTYPE, locale);
+-	      free (locale);
+-	      return path;
+-	    }
+-        }
+-      /* For all other cases ...
+-       * step over the drive designator, if present ...  */
+-      else if (len > 1 && refpath[1] == L':')
+-        {
+-	  /* FIXME: maybe should confirm *refpath is a valid drive designator.  */
+-	  refpath += 2;
+-        }
+-      /* check again, just to ensure we still have a non-empty path name ... */
+-      if (*refpath)
+-        {
+-#	undef  basename
+-#	define basename __the_basename		/* avoid shadowing. */
+-	  /* reproduce the scanning logic of the "basename" function
+-	   * to locate the basename component of the current path string,
+-	   * (but also remember where the dirname component starts).  */
+-	  wchar_t *refname, *basename;
+-	  for (refname = basename = refpath; *refpath; ++refpath)
+-	    {
+-	      if (*refpath == L'/' || *refpath == L'\\')
+-	        {
+-		  /* we found a dir separator ...
+-		   * step over it, and any others which immediately follow it.  */
+-		  while (*refpath == L'/' || *refpath == L'\\')
+-		    ++refpath;
+-		  /* if we didn't reach the end of the path string ... */
+-		  if (*refpath)
+-		    /* then we have a new candidate for the base name.  */
+-		    basename = refpath;
+-		  else
+-		    /* we struck an early termination of the path string,
+-		     * with trailing dir separators following the base name,
+-		     * so break out of the for loop, to avoid overrun.  */
+-		    break;
+-	        }
+-	    }
+-	  /* now check,
+-	   * to confirm that we have distinct dirname and basename components.  */
+-	  if (basename > refname)
+-	    {
+-	      /* and, when we do ...
+-	       * backtrack over all trailing separators on the dirname component,
+-	       * (but preserve exactly two initial dirname separators, if identical),
+-	       * and add a NUL terminator in their place.  */
+-	      do --basename;
+-	      while (basename > refname && (*basename == L'/' || *basename == L'\\'));
+-	      if (basename == refname && (refname[0] == L'/' || refname[0] == L'\\')
+-		  && refname[1] == refname[0] && refname[2] != L'/' && refname[2] != L'\\')
+-		++basename;
+-	      *++basename = L'\0';
+-	      /* if the resultant dirname begins with EXACTLY two dir separators,
+-	       * AND both are identical, then we preserve them.  */
+-	      refpath = refcopy;
+-	      while ((*refpath == L'/' || *refpath == L'\\'))
+-		++refpath;
+-	      if ((refpath - refcopy) > 2 || refcopy[1] != refcopy[0])
+-		refpath = refcopy;
+-	      /* and finally ...
+-	       * we remove any residual, redundantly duplicated separators from the dirname,
+-	       * reterminate, and return it.  */
+-	      refname = refpath;
+-	      while (*refpath)
+-	        {
+-		  if ((*refname++ = *refpath) == L'/' || *refpath++ == L'\\')
+-		    {
+-		      while (*refpath == L'/' || *refpath == L'\\')
+-			++refpath;
+-		    }
+-	        }
+-	      *refname = L'\0';
+-	      /* finally ...
+-	       * transform the resolved dirname back into the multibyte char domain,
+-	       * restore the caller's locale, and return the resultant dirname.  */
+-	      if ((len = wcstombs( path, refcopy, len )) != (size_t)(-1))
+-		path[len] = '\0';
+-	    }
+-	  else
+-	    {
+-	      /* either there were no dirname separators in the path name,
+-	       * or there was nothing else ...  */
+-	      if (*refname == L'/' || *refname == L'\\')
+-	        {
+-		  /* it was all separators, so return one.  */
+-		  ++refname;
+-	        }
+-	      else
+-	        {
+-		  /* there were no separators, so return '.'.  */
+-		  *refname++ = L'.';
+-	        }
+-	      /* add a NUL terminator, in either case,
+-	       * then transform to the multibyte char domain,
+-	       * using our own buffer.  */
+-	      *refname = L'\0';
+-	      retfail = realloc (retfail, len = 1 + wcstombs (NULL, refcopy, 0));
+-	      wcstombs (path = retfail, refcopy, len);
+-	    }
+-	  /* restore caller's locale, clean up, and return the resolved dirname.  */
+-	  setlocale (LC_CTYPE, locale);
+-	  free (locale);
+-	  return path;
+-        }
+-#	undef  basename
+-    }
+-  /* path is NULL, or an empty string; default return value is "." ...
+-   * return this in our own buffer, regenerated by wide char transform,
+-   * in case the caller trashed it after a previous call.
+-   */
+-  retfail = realloc (retfail, len = 1 + wcstombs (NULL, L".", 0));
+-  wcstombs (retfail, L".", len);
+-  /* restore caller's locale, clean up, and return the default dirname.  */
+-  setlocale (LC_CTYPE, locale);
+-  free (locale);
+-  return retfail;
++			return path;
++		}
++#undef basename
++	}
++	/* path is NULL, or an empty string; default return value is "." ...
++	 * return this in our own buffer, in case the caller trashed it after a previous call.
++	 */
++	retfail = ".";
++	/* return the default dirname.  */
++	return retfail;
+ }
