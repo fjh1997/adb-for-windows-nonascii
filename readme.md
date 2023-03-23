@@ -14,7 +14,7 @@ cd mingw-w64-crt
 ./configure
 make lib32/libmingwex.a
 ```
-replace the /prebuilts/gcc/linux-x86/host/x86_64-w64-mingw32-4.8/x86_64-w64-mingw32/lib32/libmingwex.a
+in AOSP.replace the /prebuilts/gcc/linux-x86/host/x86_64-w64-mingw32-4.8/x86_64-w64-mingw32/lib32/libmingwex.a
 clean and build adb.exe as usual.
 ```
 rm -rf out
